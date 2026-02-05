@@ -8,6 +8,7 @@ SECONDARY_COLOR = "#c4c7dc"
 ACCENT_COLOR = "#44508B"
 SECONDARY_SHADE_ONE = "#dddfeb"
 SECONDARY_SHADE_TWO = "#eaebf3"
+TINT_COLOR = "#5A5A5A"
 TEXT_COLOR = "#1C1C1C"
 ALT_TEXT_COLOR = "#FFFFFF"
 
@@ -123,7 +124,7 @@ class Data_Dashboard(QMainWindow):
         tag.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
         tag_input = QLineEdit()
         tag_input.setPlaceholderText("Enter Tag Name")
-        tag_input.setStyleSheet(f"background: {ALT_TEXT_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; border: 1px solid {TEXT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; padding: 0px 5px 0px 5px")
+        tag_input.setStyleSheet(f"background: {ALT_TEXT_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; border: 1px solid {TINT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; padding: 0px 5px 0px 5px")
         tag_input.setFixedHeight(40)
         layout_h_settings_tag.addWidget(tag, stretch=1)
         layout_h_settings_tag.addWidget(tag_input, stretch=1)
