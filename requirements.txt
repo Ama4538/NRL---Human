@@ -1,0 +1,3 @@
+numpy
+pygame
+pyquaticus @ git+https://github.com/mit-ll-trusted-autonomy/pyquaticus.git
