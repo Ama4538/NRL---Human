@@ -31,8 +31,9 @@ class Data_Dashboard(QMainWindow):
         container.setWidgetResizable(True)
         container.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         container.setStyleSheet("border: none;")
-        
+
         content = QWidget()
+        content.setStyleSheet(f"background: {ALT_TEXT_COLOR};")
         container.setWidget(content)
         self.setCentralWidget(container)
         layout = QVBoxLayout(content)
