@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
@@ -142,6 +142,28 @@ class Data_Dashboard(QMainWindow):
         layout_v_settings.addLayout(layout_h_settings_recording)
         layout.addLayout(layout_v_settings)
 
+        #------------Policy Selection and Loading Section ------------------------------------
+        #Creates agent policy dictionary that will be passed into wrapper class to assign agent policies
+        self.agent_policies = {
+            f"agent_{i}": None for i in range(6) #3v3 agents
+        }
+
+        #Main Layout 
+        agent_widget = QWidget()
+        agent_layout = QVBoxLayout(agent_widget)
+
+        agent_label = QLabel("Agent Policy Selection")
+        agent_layout.addWidget(agent_label)
+        
+
+        for i in range(6):
+            self.add_agent_row(i, agent_layout)
+
+        layout.addWidget(agent_widget)
+
+        #----------------End Policy Selection and Loading------------
+
+
         # Start Game Button
         layout.addSpacing(SPACING)
         start_button = self.create_button("Start Game", None, 200, 50, MED_FONT_SIZE)
@@ -149,6 +171,47 @@ class Data_Dashboard(QMainWindow):
         layout.addWidget(start_button, stretch = 1)
 
         layout.addStretch()
+
+    # Function to create agent dropdown menus
+    def add_agent_row(self, agent_idx, parent_layout): 
+        row_layout = QHBoxLayout()
+        label = QLabel(f"Agent {agent_idx}:")
+        row_layout.addWidget(label)
+
+        dropdown = QComboBox()
+        dropdown.addItem("Select Policy")
+        dropdown.addItem("Human (Keyboard)")
+        dropdown.addItem("Trained Policy")
+        
+        # Ensure dropdown list is opaque and above other widgets
+        dropdown.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                selection-background-color: #d0d0d0;
+            }
+        """)
+        
+        row_layout.addWidget(dropdown)
+
+        #Load policy button
+        load_button = QPushButton("Load Policy")
+        load_button.clicked.connect(lambda _, idx=agent_idx: self.load_policy(idx))
+        row_layout.addWidget(load_button)
+
+        parent_layout.addLayout(row_layout)
+
+    def load_policy(self, agent_idx):
+        #Open file dialog and store path in agent_policies
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, f"Select Policy for Agent {agent_idx}", "", "Policy Files (*.pkl *.msgpack)")
+        if file_path:
+            self.agentPolicies[f"agen_{agent_idx}"] = file_path
+            print(f"Agent {agent_idx} policy set to: {file_path}")
+
+
 
     # Function to create stat card
     def create_stat_card(self, title, value, data_type):
