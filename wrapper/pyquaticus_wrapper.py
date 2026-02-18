@@ -7,13 +7,30 @@ from pyquaticus.config import config_dict_std
 from pyquaticus.base_policies.key_agent import KeyAgent
 
 class PyquaticusWrapper:
-    def __init__(self, team_size = 3, render_mode="human"):
+    def __init__(self, agent_map, team_size = 3, render_mode="human"):
+        self.agent_map = agent_map
         self.team_size = team_size
         self.render_mode = render_mode
 
         self.env = None
         self.trajectory = []
-        self.key_agent = None
+        #self.key_agent = None
+
+    def get_action(self, agent_id, obs, info):
+        controller = self.agent_map.get(agent_id)
+
+        if controller is None:
+            return 0
+        
+        #Keyboard agent
+        if hasattr(controller, "compute_action"):
+            return controller.compute_action(obs, info)
+        
+        #RL Policy
+        if hasattr(controller, "compute_single_action"):
+            return controller.compute_single_action(obs)[0]
+        
+        raise ValueError(f"Unknown controller type for {agent_id}")
 
     def launch_env(self):
         config = config_dict_std.copy()
@@ -25,7 +42,7 @@ class PyquaticusWrapper:
             render_mode = self.render_mode,
             team_size = self.team_size,
         )
-        self.key_agent = KeyAgent()
+        #self.key_agent = KeyAgent()
 
     def run(self, max_steps = 500):
         obs, info = self.env.reset()
@@ -33,10 +50,13 @@ class PyquaticusWrapper:
         for step in range(max_steps):
             actions = {}
 
-            actions['agent_0'] = self.key_agent.compute_action(obs['agent_0'], info)
+            for agent_id in obs.keys():
+                actions[agent_id] = self.get_action(
+                    agent_id,
+                    obs[agent_id],
+                    info
+                )
 
-            for i in range(1, self.team_size * 2):
-                actions[f'agent_{i}'] = 0
 
             next_obs, reward, term, trunc, info = self.env.step(actions)
 
