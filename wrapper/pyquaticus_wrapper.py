@@ -13,10 +13,11 @@ class PyquaticusWrapper:
         self.render_mode = render_mode
 
         self.env = None
-        self.trajectory = []
+        self.trajectory = [] #List of dictionaries that contain information from each step
         #self.key_agent = None
 
     def get_action(self, agent_id, obs, info):
+        #Access agent map values to get correct action based on agent type
         controller = self.agent_map.get(agent_id)
 
         if controller is None:
@@ -42,7 +43,6 @@ class PyquaticusWrapper:
             render_mode = self.render_mode,
             team_size = self.team_size,
         )
-        #self.key_agent = KeyAgent()
 
     def run(self, max_steps = 500):
         obs, info = self.env.reset()
@@ -78,6 +78,7 @@ class PyquaticusWrapper:
 
         self.env.close()
 
+    #Saves trajectory to npz file
     def save(self, filename = "test_run"):
         folder = os.path.join(os.path.dirname(__file__), "../data/sessions")
         os.makedirs(folder, exist_ok=True)
