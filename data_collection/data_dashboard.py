@@ -1,5 +1,8 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy
+import csv
+import os
+from datetime import datetime
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QMessageBox
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
@@ -61,8 +64,8 @@ class Data_Dashboard(QMainWindow):
         layout.addSpacing(SPACING)
         
         # Stats Cards
-        total_collected_card = self.create_stat_card("Total Collected Data", len(self._valid), "Games")
-        invalid_collected_card = self.create_stat_card("Total Invalid Data", len(self._invalid), "Invalid")
+        total_collected_card = self.create_stat_card("Total Collected Data", len(self._valid), "Games", store_key="_total_label")
+        invalid_collected_card = self.create_stat_card("Total Invalid Data", len(self._invalid), "Invalid", store_key="_invalid_label")
         layout_h_card = QHBoxLayout()
         layout_h_card.setSpacing(10)
         layout_h_card.addWidget(total_collected_card)
@@ -72,6 +75,7 @@ class Data_Dashboard(QMainWindow):
         # Valid collected data
         layout.addSpacing(SPACING)
         layout_v_collected = QVBoxLayout()
+        self._layout_v_collected = layout_v_collected
         layout_v_collected.setSpacing(10)
         layout_h_collected_title = QHBoxLayout()
         layout_h_collected_buttons = QHBoxLayout()
@@ -79,7 +83,7 @@ class Data_Dashboard(QMainWindow):
         collected_title = self.create_section_title("Recently Collected")
 
         # TODO: ADD function to export selected
-        collected_export = self.create_button("Export", None)
+        collected_export = self.create_button("Export", self.on_export_valid_clicked)
         collected_delete = self.create_button("Delete", None)
 
         layout_h_collected_buttons.addWidget(collected_delete)
@@ -89,18 +93,19 @@ class Data_Dashboard(QMainWindow):
         layout_h_collected_title.addStretch()
         layout_h_collected_title.addLayout(layout_h_collected_buttons)
         
-        # Collected Data Table 
+        # Collected Data Table
         collected_table_header = self.create_table_row(["Name", "Time", "Tag", "Selected"])
-        collected_table_content = self.create_table_content(self._valid)
+        self._collected_table_content, self._valid_checkboxes = self.create_table_content(self._valid)
 
         layout_v_collected.addLayout(layout_h_collected_title)
         layout_v_collected.addWidget(collected_table_header)
-        layout_v_collected.addWidget(collected_table_content)
+        layout_v_collected.addWidget(self._collected_table_content)
         layout.addLayout(layout_v_collected)
 
         # Invalid data
         layout.addSpacing(SPACING)
         layout_v_invalid = QVBoxLayout()
+        self._layout_v_invalid = layout_v_invalid
         layout_v_invalid.setSpacing(10)
         layout_h_invalid_title = QHBoxLayout()
         layout_h_invalid_buttons = QHBoxLayout()
@@ -108,7 +113,7 @@ class Data_Dashboard(QMainWindow):
         invalid_title = self.create_section_title("Invalid Data")    
 
         # TODO: ADD function to export selected
-        invalid_export = self.create_button("Export", None)
+        invalid_export = self.create_button("Export", self.on_export_invalid_clicked)
         invalid_delete = self.create_button("Keep", None)
 
         layout_h_invalid_buttons.addWidget(invalid_delete)
@@ -118,13 +123,13 @@ class Data_Dashboard(QMainWindow):
         layout_h_invalid_title.addStretch()
         layout_h_invalid_title.addLayout(layout_h_invalid_buttons)
         
-        # invalid Data Table 
+        # invalid Data Table
         invalid_table_header = self.create_table_row(["Name", "Time", "Error", "Selected"])
-        invalid_table_content = self.create_table_content(self._invalid)
+        self._invalid_table_content, self._invalid_checkboxes = self.create_table_content(self._invalid)
 
         layout_v_invalid.addLayout(layout_h_invalid_title)
         layout_v_invalid.addWidget(invalid_table_header)
-        layout_v_invalid.addWidget(invalid_table_content)
+        layout_v_invalid.addWidget(self._invalid_table_content)
         layout.addLayout(layout_v_invalid)
 
         # Settings
@@ -167,7 +172,7 @@ class Data_Dashboard(QMainWindow):
         layout.addStretch()
 
     # Function to create stat card
-    def create_stat_card(self, title, value, data_type):
+    def create_stat_card(self, title, value, data_type, store_key=None):
         card = QFrame()
         card.setStyleSheet(f"background: {PRIMARY_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR};")
         layout = QVBoxLayout(card)
@@ -180,6 +185,9 @@ class Data_Dashboard(QMainWindow):
         value = QLabel(f"{value} {data_type}")
         value.setStyleSheet(f"font-size: {LARGE_FONT_SIZE}; font-weight: 500")
 
+        if store_key:
+            setattr(self, store_key, value)
+
         layout.addWidget(title)
         layout.addWidget(value)
         return card
@@ -191,7 +199,7 @@ class Data_Dashboard(QMainWindow):
         return title
 
     # Create a table header layout
-    def create_table_row(self, labels, selectable = False):
+    def create_table_row(self, labels, selectable=False, checkbox=None):
         header = QFrame()
         header.setStyleSheet(f"background-color: {SECONDARY_COLOR}; border-radius: 4px; font-weight: 600")
         layout = QHBoxLayout(header)
@@ -204,10 +212,10 @@ class Data_Dashboard(QMainWindow):
 
             # Add check box to the last element if allowed
             if (i == len(labels) - 1 and selectable):
-                checkbox = QCheckBox()
-                checkbox.setCursor(QCursor(Qt.PointingHandCursor))
+                cb = checkbox if checkbox is not None else QCheckBox()
+                cb.setCursor(QCursor(Qt.PointingHandCursor))
                 column_layout.setContentsMargins(0, 0, 30, 0)
-                column_layout.addWidget(checkbox, alignment=Qt.AlignRight | Qt.AlignVCenter)
+                column_layout.addWidget(cb, alignment=Qt.AlignRight | Qt.AlignVCenter)
             else:
                 label = QLabel(text)
                 label.setStyleSheet(f"font-size: {SMALL_FONT_SIZE}px; color: {TEXT_COLOR};")
@@ -230,7 +238,7 @@ class Data_Dashboard(QMainWindow):
 
         return header
     
-    # Create table content
+    # Create table content — returns (container, checkboxes)
     def create_table_content(self, content):
         container = QScrollArea()
         container.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -244,17 +252,20 @@ class Data_Dashboard(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
+        checkboxes = []
         for i, (name, time, tag) in enumerate(content):
-            row = self.create_table_row([name, time, tag, ""], True)
+            cb = QCheckBox()
+            checkboxes.append(cb)
+            row = self.create_table_row([name, time, tag, ""], True, checkbox=cb)
             layout.addWidget(row)
 
             if i % 2 == 0:
                 row.setStyleSheet(f"background-color: {SECONDARY_SHADE_ONE}; border-radius: 4px; font-weight: 600")
-            else: 
+            else:
                 row.setStyleSheet(f"background-color: {SECONDARY_SHADE_TWO}; border-radius: 4px; font-weight: 600")
-        
+
         layout.addStretch()
-        return container
+        return container, checkboxes
 
 
     # Generate Default button
@@ -264,9 +275,51 @@ class Data_Dashboard(QMainWindow):
         button.setFixedHeight(height)
         button.setCursor(QCursor(Qt.PointingHandCursor))
         button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {textSize}; font-weight: 500;")
-        # button.clicked.connect(on_click)
+        if on_click is not None:
+            button.clicked.connect(on_click)
         return button
 
+
+    def _refresh_tables(self):
+        self._valid, self._invalid = split_valid_invalid_rows(self._entries)
+        self._total_label.setText(f"{len(self._valid)} Games")
+        self._invalid_label.setText(f"{len(self._invalid)} Invalid")
+        self._collected_table_content.setParent(None)
+        self._invalid_table_content.setParent(None)
+        self._collected_table_content, self._valid_checkboxes = self.create_table_content(self._valid)
+        self._invalid_table_content, self._invalid_checkboxes = self.create_table_content(self._invalid)
+        self._layout_v_collected.addWidget(self._collected_table_content)
+        self._layout_v_invalid.addWidget(self._invalid_table_content)
+
+    def _write_csv(self, path, rows):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerows(rows)
+
+    def on_export_valid_clicked(self):
+        selected = [row for row, cb in zip(self._valid, self._valid_checkboxes) if cb.isChecked()]
+        if not selected:
+            QMessageBox.warning(self, "Export", "No rows selected.\nCheck the boxes next to the rows you want to export.")
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        filename = f"valid_data_{timestamp}.csv"
+        export_path = os.path.join(os.path.dirname(__file__), "exports", filename)
+        self._write_csv(export_path, [["name", "time", "tag"]] + selected)
+        os.system(f'open "{os.path.dirname(export_path)}"')
+        QMessageBox.information(self, "Export", f"Exported {len(selected)} valid game(s) to:\nexports/{filename}")
+
+    def on_export_invalid_clicked(self):
+        selected = [row for row, cb in zip(self._invalid, self._invalid_checkboxes) if cb.isChecked()]
+        if not selected:
+            QMessageBox.warning(self, "Export", "No rows selected.\nCheck the boxes next to the rows you want to export.")
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        filename = f"invalid_data_{timestamp}.csv"
+        quarantine_path = os.path.join(os.path.dirname(__file__), "exports", filename)
+        self._write_csv(quarantine_path, [["name", "time", "error"]] + selected)
+        os.system(f'open "{os.path.dirname(quarantine_path)}"')
+        QMessageBox.information(self, "Export", f"Exported {len(selected)} invalid row(s) to:\nexports/{filename}")
 
     def get_colleceted_data(self):
         return self._valid
