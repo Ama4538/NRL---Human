@@ -1,3 +1,0 @@
-name,time,error
-Unknown,30:20,Missing or invalid name
-Game_3,bad_time,Invalid time format (expected MM:SS or ISO datetime)
