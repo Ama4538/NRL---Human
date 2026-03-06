@@ -27,7 +27,15 @@ SPACING = 20
 class Data_Dashboard(QMainWindow):
     def __init__(self, entries=None):
         super().__init__()
-        self._entries = list(entries) if entries is not None else self.get_colleceted_data()
+        # If no entries passed, use a small stub list so UI isn't empty in demo
+        if entries is None:
+            self._entries = [
+                ["Game_1", "30:20", "D&C"],     # valid
+                ["", "30:20", "tag"],           # invalid: missing name
+                ["Game_3", "bad_time", "tag"],  # invalid: bad time
+            ]
+        else:
+            self._entries = list(entries)
         self._valid, self._invalid = split_valid_invalid_rows(self._entries)
         self.setWindowTitle("Data Collection Dashboard")
         self.setMinimumSize(450, 720)
