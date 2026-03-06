@@ -3,6 +3,11 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, Q
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
+try:
+    from data_collection.validation import split_valid_invalid_rows
+except ModuleNotFoundError:
+    from validation import split_valid_invalid_rows
+
 PRIMARY_COLOR = "#263065"
 SECONDARY_COLOR = "#c4c7dc"
 ACCENT_COLOR = "#44508B"
@@ -20,8 +25,10 @@ SMALL_FONT_SIZE = "14px"
 SPACING = 20
 
 class Data_Dashboard(QMainWindow):
-    def __init__(self):
+    def __init__(self, entries=None):
         super().__init__()
+        self._entries = list(entries) if entries is not None else self.get_colleceted_data()
+        self._valid, self._invalid = split_valid_invalid_rows(self._entries)
         self.setWindowTitle("Data Collection Dashboard")
         self.setMinimumSize(450, 720)
         self.resize(500, 800)
@@ -46,8 +53,8 @@ class Data_Dashboard(QMainWindow):
         layout.addSpacing(SPACING)
         
         # Stats Cards
-        total_collected_card = self.create_stat_card("Total Collected Data", 0, "Games")
-        invalid_collected_card = self.create_stat_card("Total Invalid Data", 0, "Invalid")
+        total_collected_card = self.create_stat_card("Total Collected Data", len(self._valid), "Games")
+        invalid_collected_card = self.create_stat_card("Total Invalid Data", len(self._invalid), "Invalid")
         layout_h_card = QHBoxLayout()
         layout_h_card.setSpacing(10)
         layout_h_card.addWidget(total_collected_card)
@@ -76,7 +83,7 @@ class Data_Dashboard(QMainWindow):
         
         # Collected Data Table 
         collected_table_header = self.create_table_row(["Name", "Time", "Tag", "Selected"])
-        collected_table_content = self.create_table_content(self.get_colleceted_data())
+        collected_table_content = self.create_table_content(self._valid)
 
         layout_v_collected.addLayout(layout_h_collected_title)
         layout_v_collected.addWidget(collected_table_header)
@@ -105,7 +112,7 @@ class Data_Dashboard(QMainWindow):
         
         # invalid Data Table 
         invalid_table_header = self.create_table_row(["Name", "Time", "Error", "Selected"])
-        invalid_table_content = self.create_table_content(self.get_invalid_data())
+        invalid_table_content = self.create_table_content(self._invalid)
 
         layout_v_invalid.addLayout(layout_h_invalid_title)
         layout_v_invalid.addWidget(invalid_table_header)
@@ -253,27 +260,11 @@ class Data_Dashboard(QMainWindow):
         return button
 
 
-    # TODO: Update method to get data
     def get_colleceted_data(self):
-        data = [
-        ["Game_1", "30:20", "D&C"],
-        ["Game_2", "30:20", "D&C"],
-        ["Game_3",  "30:20", "D&C"],
-        ["Game_4", "30:20", "D&C"],
-        ["Game_5", "30:20", "D&C"],
-        ]
-        return data
-    
-    # TODO: Update method to get data
+        return self._valid
+
     def get_invalid_data(self):
-        data = [
-        ["Game_1", "30:20", "Corrupt"],
-        ["Game_2", "30:20", "Corrupt"],
-        ["Game_3",  "30:20", "Corrupt"],
-        ["Game_4", "30:20", "Corrupt"],
-        ["Game_5", "30:20", "Corrupt"],
-        ]
-        return data
+        return self._invalid
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
