@@ -2,6 +2,8 @@ import numpy as np
 import time
 import datetime
 import os
+import zmq
+import pygame
 from pyquaticus import pyquaticus_v0
 from pyquaticus.config import config_dict_std 
 from pyquaticus.base_policies.key_agent import KeyAgent
@@ -15,6 +17,12 @@ class PyquaticusWrapper:
         self.env = None
         self.trajectory = [] #List of dictionaries that contain information from each step
         #self.key_agent = None
+
+        # Initialize ZMQ for external control
+        self.zmq_context = zmq.Context()
+        self.pub_socket = self.zmq_context.socket(zmq.PUB)
+        self.pub_socket.bind("tcp://*:5555") #PORT 55555 for external control
+
 
     def get_action(self, agent_id, obs, info):
         #Access agent map values to get correct action based on agent type
@@ -59,6 +67,18 @@ class PyquaticusWrapper:
 
 
             next_obs, reward, term, trunc, info = self.env.step(actions)
+            
+            self.env.render() # Forces the Mac window to draw the frame
+            print(f"Step {step} completed...") # Heartbeat in the terminal
+
+            # --- Data broasting for external control ---
+            payload = {
+                "step": step,
+                "reward": {k: float(v) for k, v in reward.items()},
+                "game_active": True
+            }
+            self.pub_socket.send_json(payload)
+            # --------------------------------------------- 
 
             self.trajectory.append({
                 "obs": obs,
@@ -72,6 +92,7 @@ class PyquaticusWrapper:
             obs = next_obs
 
             if any(term.values()) or any(trunc.values()):
+                self.pub_socket.send_json({"game_active": False}) #Notify external controller that game has ended
                 break
 
             #time.sleep(frame_delay)

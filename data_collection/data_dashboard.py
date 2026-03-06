@@ -1,6 +1,8 @@
 import sys
+import zmq
+import subprocess
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer   
 from PySide6.QtGui import QCursor
 
 PRIMARY_COLOR = "#263065"
@@ -164,14 +166,34 @@ class Data_Dashboard(QMainWindow):
 
         #----------------End Policy Selection and Loading------------
 
-
-        # Start Game Button
+        # --- LIVE TELEMETRY UI ---
         layout.addSpacing(SPACING)
-        start_button = self.create_button("Start Game", None, 200, 50, MED_FONT_SIZE)
+        live_title = self.create_section_title("Live Simulation Status")
+        
+        # We attach this label to 'self' so poll_zmq can access it
+        self.live_step_label = QLabel("Waiting for game to start...")
+        self.live_step_label.setStyleSheet(f"font-size: {MED_FONT_SIZE}; font-weight: 600; color: {ACCENT_COLOR}")
+        
+        layout.addWidget(live_title)
+        layout.addWidget(self.live_step_label)
+
+        # Start Game Button --- 
+        layout.addSpacing(SPACING)
+        start_button = self.create_button("Start Game", self.start_game, 200, 50, MED_FONT_SIZE)
         start_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(start_button, stretch = 1)
 
         layout.addStretch()
+
+        # --- ZMQ for external control ---
+        self.zmq_context = zmq.Context()
+        self.sub_socket = self.zmq_context.socket(zmq.SUB)
+        self.sub_socket.connect("tcp://localhost:5555")
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "") 
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.poll_zmq)
+        self.timer.start(50) # Check every 50ms
 
     # Function to create agent dropdown menus
     def add_agent_row(self, agent_idx, parent_layout): 
@@ -209,7 +231,7 @@ class Data_Dashboard(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self, f"Select Policy for Agent {agent_idx}", "", "Policy Files (*.pkl *.msgpack)")
         if file_path:
-            self.agentPolicies[f"agen_{agent_idx}"] = file_path
+            self.agent_policies[f"agen_{agent_idx}"] = file_path
             print(f"Agent {agent_idx} policy set to: {file_path}")
 
 
@@ -312,7 +334,8 @@ class Data_Dashboard(QMainWindow):
         button.setFixedHeight(height)
         button.setCursor(QCursor(Qt.PointingHandCursor))
         button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {textSize}; font-weight: 500;")
-        # button.clicked.connect(on_click)
+        if on_click:
+            button.clicked.connect(on_click)
         return button
 
 
@@ -337,6 +360,27 @@ class Data_Dashboard(QMainWindow):
         ["Game_5", "30:20", "Corrupt"],
         ]
         return data
+    
+    def start_game(self):
+        # Run the script to start the game environment in a separate process
+        subprocess.Popen(["python", "-m", "scripts.run_game"])
+
+    def poll_zmq(self):
+        # Poll ZMQ for updates from the game environment
+        try:
+            while True:
+                message = self.sub_socket.recv_json(flags=zmq.NOBLOCK)
+                # Process the message and update the dashboard accordingly
+                current_step = message.get("step", 0)
+                is_active = message.get("game_active", False)
+                
+                if is_active:
+                    self.live_step_label.setText(f"Game Running - Current Step: {current_step}")
+                else:
+                    self.live_step_label.setText("Game Ended.")
+        except zmq.Again:
+            pass  # No message received, continue polling
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

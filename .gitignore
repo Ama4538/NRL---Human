@@ -14,3 +14,4 @@ _version.py
 *.avi
 __mapcache__/
 data/
+pyquaticus/ 
