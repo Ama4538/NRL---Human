@@ -1,6 +1,7 @@
 import sys
 import zmq
 import subprocess
+import json
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog
 from PySide6.QtCore import Qt, QTimer   
 from PySide6.QtGui import QCursor
