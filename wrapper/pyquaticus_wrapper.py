@@ -8,6 +8,25 @@ from pyquaticus import pyquaticus_v0
 from pyquaticus.config import config_dict_std 
 from pyquaticus.base_policies.key_agent import KeyAgent
 
+class AgentController:
+    def __init__(self, agent_type: str, controller, agent_id, label: str = ""):
+        self.agent_type = agent_type #"keyboard", "heuristic", "rl"
+        self.controller = controller
+        self.agent_id = agent_id
+        self.label = label #policy name or path
+
+    def get_action(self, obs, info):
+        if self.agent_type == "keyboard":
+            return self.controller.compute_action(obs[self.agent_id], info)
+        elif self.agent_type == "heuristic": 
+            agent_obs = {self.agent_id : info[self.agent_id]['unnorm_obs']}
+            return self.controller.compute_action(agent_obs)
+        elif self.agent_type == "rl":
+            return self.controller.compute_single_action(obs[self.agent_id])[0]
+        raise ValueError(f"Unknown agent type: {self.agent_type}")
+
+        
+
 class PyquaticusWrapper:
     def __init__(self, agent_map, team_size = 3, render_mode="human"):
         self.agent_map = agent_map
@@ -25,21 +44,10 @@ class PyquaticusWrapper:
 
 
     def get_action(self, agent_id, obs, info):
-        #Access agent map values to get correct action based on agent type
-        controller = self.agent_map.get(agent_id)
-
-        if controller is None:
+        curr_agent = self.agent_map.get(agent_id)
+        if curr_agent is None: 
             return 0
-        
-        #Keyboard agent
-        if hasattr(controller, "compute_action"):
-            return controller.compute_action(obs, info)
-        
-        #RL Policy
-        if hasattr(controller, "compute_single_action"):
-            return controller.compute_single_action(obs)[0]
-        
-        raise ValueError(f"Unknown controller type for {agent_id}")
+        return curr_agent.get_action(obs, info)
 
     def launch_env(self):
         config = config_dict_std.copy()
@@ -52,16 +60,40 @@ class PyquaticusWrapper:
             team_size = self.team_size,
         )
 
+        from pyquaticus.base_policies.deprecated.base_attack import BaseAttacker
+        from pyquaticus.base_policies.deprecated.base_defend import BaseDefender
+        from pyquaticus.base_policies.deprecated.base_combined import Heuristic_CTF_Agent
+        from pyquaticus.structs import Team
+
+        policy_map = {
+                "Base Attack": BaseAttacker,
+                "Base Defend": BaseDefender,
+                "Base Combined": Heuristic_CTF_Agent
+        }
+
+        for agent_id, entry in self.agent_map.items():
+            if entry.agent_type == "heuristic":
+                agent_idx = int(agent_id.split("_")[1])
+                team = Team.BLUE_TEAM if agent_idx < self.team_size else Team.RED_TEAM
+                policy_class = policy_map[entry.label]
+                entry.controller = policy_class(
+                    agent_id = agent_id, 
+                    team = team,
+                    max_speed = self.env.max_speeds[agent_idx],
+                    aquaticus_field_points=self.env.aquaticus_field_points, 
+                )
+
     def run(self, max_steps = 500):
         obs, info = self.env.reset()
 
         for step in range(max_steps):
+            
             actions = {}
 
             for agent_id in obs.keys():
                 actions[agent_id] = self.get_action(
                     agent_id,
-                    obs[agent_id],
+                    obs,
                     info
                 )
 

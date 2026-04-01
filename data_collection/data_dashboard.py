@@ -1,9 +1,10 @@
 import sys
+import os
 import zmq
 import subprocess
-import json
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog
-from PySide6.QtCore import Qt, QTimer   
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog, QMessageBox, QInputDialog
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
 PRIMARY_COLOR = "#263065"
@@ -11,7 +12,7 @@ SECONDARY_COLOR = "#c4c7dc"
 ACCENT_COLOR = "#44508B"
 SECONDARY_SHADE_ONE = "#dddfeb"
 SECONDARY_SHADE_TWO = "#eaebf3"
-TINT_COLOR = "#5A5A5A"
+TINT_COLOR = "#dcdcdc"
 TEXT_COLOR = "#1C1C1C"
 ALT_TEXT_COLOR = "#FFFFFF"
 
@@ -21,6 +22,7 @@ DEFAULT_FONT_SIZE = "16px"
 SMALL_FONT_SIZE = "14px"
 
 SPACING = 20
+TOTAL_AGENT = 6
 
 class Data_Dashboard(QMainWindow):
     def __init__(self):
@@ -128,7 +130,7 @@ class Data_Dashboard(QMainWindow):
         tag.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
         tag_input = QLineEdit()
         tag_input.setPlaceholderText("Enter Tag Name")
-        tag_input.setStyleSheet(f"background: {ALT_TEXT_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; border: 1px solid {TINT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; padding: 0px 5px 0px 5px")
+        tag_input.setStyleSheet(f"background: {ALT_TEXT_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; border: 1px solid {PRIMARY_COLOR}; font-size: {DEFAULT_FONT_SIZE}; padding: 0px 5px 0px 5px")
         tag_input.setFixedHeight(40)
         layout_h_settings_tag.addWidget(tag, stretch=1)
         layout_h_settings_tag.addWidget(tag_input, stretch=1)
@@ -145,22 +147,29 @@ class Data_Dashboard(QMainWindow):
         layout_v_settings.addLayout(layout_h_settings_tag)
         layout_v_settings.addLayout(layout_h_settings_recording)
         layout.addLayout(layout_v_settings)
+        layout.addSpacing(SPACING / 2)
 
         #------------Policy Selection and Loading Section ------------------------------------
-        #Creates agent policy dictionary that will be passed into wrapper class to assign agent policies
+        # Creates agent policy dictionary that will be passed into wrapper class to assign agent policies
         self.agent_policies = {
-            f"agent_{i}": None for i in range(6) #3v3 agents
+            f"agent_{i}": None for i in range(TOTAL_AGENT) 
         }
 
-        #Main Layout 
+        # Main Layout 
         agent_widget = QWidget()
         agent_layout = QVBoxLayout(agent_widget)
+        agent_layout.setSpacing(10)
+        agent_layout.setContentsMargins(0, 0, 0, 0)
 
         agent_label = QLabel("Agent Policy Selection")
+        agent_label.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
         agent_layout.addWidget(agent_label)
-        
+        agent_layout.addSpacing(10)
 
-        for i in range(6):
+        self.agent_dropdowns = {}
+        self.agent_load_buttons = {}
+
+        for i in range(TOTAL_AGENT):
             self.add_agent_row(i, agent_layout)
 
         layout.addWidget(agent_widget)
@@ -182,6 +191,7 @@ class Data_Dashboard(QMainWindow):
         layout.addSpacing(SPACING)
         start_button = self.create_button("Start Game", self.start_game, 200, 50, MED_FONT_SIZE)
         start_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        start_button.clicked.connect(self.start_game)
         layout.addWidget(start_button, stretch = 1)
 
         layout.addStretch()
@@ -200,41 +210,209 @@ class Data_Dashboard(QMainWindow):
     def add_agent_row(self, agent_idx, parent_layout): 
         row_layout = QHBoxLayout()
         label = QLabel(f"Agent {agent_idx}:")
+        label.setStyleSheet(f"font-size: {MED_FONT_SIZE}px; color: {TEXT_COLOR};")
         row_layout.addWidget(label)
 
         dropdown = QComboBox()
+        dropdown.setCursor(Qt.PointingHandCursor)
+        dropdown.view().viewport().setCursor(Qt.PointingHandCursor)
         dropdown.addItem("Select Policy")
         dropdown.addItem("Human (Keyboard)")
         dropdown.addItem("Trained Policy")
+        dropdown.addItem("Heuristic")
         
         # Ensure dropdown list is opaque and above other widgets
-        dropdown.setStyleSheet("""
-            QComboBox {
-                background-color: white;
-            }
-            QComboBox QAbstractItemView {
-                background-color: white;
-                selection-background-color: #d0d0d0;
-            }
+        dropdown.setStyleSheet(f"""
+            QComboBox {{
+                background: {ALT_TEXT_COLOR};
+                color: {TEXT_COLOR};
+                border: 1px solid c;
+                border-radius: 4px;
+                padding: 2px 5px;
+                min-height: 20px;
+            }}
+            
+            QComboBox[selected="true"] {{
+                background: {SECONDARY_SHADE_TWO}; 
+            }}
+
+            QComboBox::drop-down {{
+                border: 0px;
+            }}
+
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {SECONDARY_COLOR};
+                color: {TEXT_COLOR};
+            }}
         """)
+
+        #Save reference to agent dropdowns
+        self.agent_dropdowns[agent_idx] = dropdown
+
+        dropdown.currentIndexChanged.connect(
+            lambda _, idx=agent_idx: self.update_load_button(idx, dropdown)
+        )
         
         row_layout.addWidget(dropdown)
 
         #Load policy button
-        load_button = QPushButton("Load Policy")
-        load_button.clicked.connect(lambda _, idx=agent_idx: self.load_policy(idx))
+        load_button = QPushButton("Select First to Load")
+        load_button.setStyleSheet(f"""
+            QPushButton {{
+                background: {ACCENT_COLOR}; 
+                color: {ALT_TEXT_COLOR}; 
+                border: 1px solid {PRIMARY_COLOR}; 
+                border-radius: 4px; 
+                padding: 2px 5px; 
+                min-height: 20px;
+            }}
+
+            QPushButton:disabled {{
+                background: {TINT_COLOR};       
+                color: {TEXT_COLOR};          
+                border: 1px solid {TEXT_COLOR};
+            }}
+        """)
+        load_button.setCursor(Qt.PointingHandCursor)
+        load_button.setEnabled(False)
+
+        #Save reference to agent load buttons 
+        self.agent_load_buttons[agent_idx] = load_button
+
+        load_button.clicked.connect(lambda _, idx=agent_idx: self.load_policy(idx, load_button))
+        
         row_layout.addWidget(load_button)
 
         parent_layout.addLayout(row_layout)
 
-    def load_policy(self, agent_idx):
-        #Open file dialog and store path in agent_policies
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, f"Select Policy for Agent {agent_idx}", "", "Policy Files (*.pkl *.msgpack)")
-        if file_path:
-            self.agent_policies[f"agen_{agent_idx}"] = file_path
-            print(f"Agent {agent_idx} policy set to: {file_path}")
+    def validate_policy_path(self, policy_path):
+        """
+        Returns True of the folder is a valid RLlib agent policy, otherwise False
+        Shows a popup error message if invalid
+        """
 
+        if not policy_path:
+            return False
+        
+        if not os.path.isdir(policy_path):
+            QMessageBox.warning(self, "Invalid Policy", f"The selected path is not a folder:\n{policy_path}")
+            return False
+        
+        #Look for required files
+        '''
+        For Policy.from_checkpoint() to work, the checkpoint directory needs to contain an
+        rllib_checkpoint.json file (metadata about checkpoint version and structure) and a 
+        policy_state.pkl file (Store actual neural network weights and state)
+        '''
+
+        required_files = ["rllib_checkpoint.json", "policy_state.pkl"]
+        missing_files = [f for f in required_files if not os.path.exists(os.path.join(policy_path, f))]
+
+        if missing_files:
+            QMessageBox.warning(
+                self,
+                "Invalid Policy", 
+                f"The selected folder is missing the following files:\n" + "\n".join(missing_files)
+            )
+            return False
+        
+        return True
+    
+    def load_policy(self, agent_idx, load_button):
+        from wrapper.pyquaticus_wrapper import AgentController
+        selection = self.agent_dropdowns[agent_idx].currentText()
+        agent_key = f"agent_{agent_idx}"
+
+        try:
+            load_button.setText("Loaded")
+            if selection == "Human (Keyboard)":
+                from pyquaticus.base_policies.key_agent import KeyAgent
+                self.agent_policies[agent_key] = AgentController("keyboard", KeyAgent(), agent_key) 
+                print(f"Agent {agent_idx} assigned to Human (Keyboard).")
+
+            elif selection == "Heuristic":
+                heuristic_type, ok = QInputDialog.getItem(
+                    self, 
+                    f"Select Heuristic Type for Agent {agent_idx}", 
+                    "Heuristic Type:",
+                    ["Base Attack", "Base Defend", "Base Combined"],
+                    editable=False 
+                )
+                if not ok: 
+                    return 
+                
+                '''
+                #Map string to actual policy class 
+                from pyquaticus.base_policies.deprecated.base_attack import BaseAttacker
+                from pyquaticus.base_policies.deprecated.base_defend import BaseDefender
+                from pyquaticus.base_policies.deprecated.base_combined import Heuristic_CTF_Agent
+
+                policy_map = {
+                    "Base Attack": BaseAttacker,
+                    "Base Defend": BaseDefender,
+                    "Base Combined": Heuristic_CTF_Agent
+                }
+                '''
+                #controller = policy_map[heuristic_type]()
+
+                self.agent_policies[agent_key] = AgentController("heuristic", None, agent_key, label=heuristic_type)
+                print(f"Agent {agent_idx} assigned to Heuristic: {heuristic_type}")
+
+            elif selection == "Trained Policy":
+            
+                #Open file dialog and store path in agent_policies
+                policy_dir = QFileDialog.getExistingDirectory(
+                    self, 
+                    f"Select Policy Folder for Agent {agent_idx}",
+                    "",
+                )
+                if not policy_dir:
+                    return
+                
+                #Convert to absolute path 
+                policy_dir = os.path.abspath(policy_dir)
+
+                #Validate selected path
+                if not self.validate_policy_path(policy_dir):
+                    return
+                
+                #Load actual RL policy from the checkpoint path
+                from ray.rllib.policy.policy import Policy
+                policy = Policy.from_checkpoint(policy_dir)
+                self.agent_policies[agent_key] = AgentController("rl", policy, agent_key, label = policy_dir)
+                print(f"Agent {agent_idx} policy set to: {policy_dir}")
+            
+            else:
+                load_button.setText("Load Policy")
+                QMessageBox.warning(self, "Invalid Selection", "Please select a valid agent policy.")
+        except Exception as e:
+            load_button.setText("Load Policy")
+            print(f"Error Loading Agent {agent_idx}")
+
+
+    def update_load_button(self, agent_idx, dropdown):
+        selection = self.agent_dropdowns[agent_idx].currentText()
+        button = self.agent_load_buttons[agent_idx]
+
+        valid = selection != "Select Policy"
+        button.setText("Load Policy" if valid else "Select First to Load")
+        button.setEnabled(valid)
+        dropdown.setProperty("selected", valid)
+        dropdown.style().unpolish(dropdown)
+        dropdown.style().polish(dropdown)
+        
+    def start_game(self):
+        from wrapper.pyquaticus_wrapper import PyquaticusWrapper
+
+        if len(self.agent_policies) < 6: 
+            QMessageBox.warning(self, "Missing Policies", "Please assign a policy to all agents before starting.")
+            return
+        
+        wrapper = PyquaticusWrapper(agent_map=self.agent_policies, team_size = 3)
+        wrapper.launch_env()
+        self.close() #TEMPORARY NEED TO REMOVE 
+        wrapper.run(max_steps = 300)
+        wrapper.save("test_run")
 
 
     # Function to create stat card
