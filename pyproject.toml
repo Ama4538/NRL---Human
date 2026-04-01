@@ -59,7 +59,8 @@ dependencies = [
 	"scipy",
 	"shapely",
 	"sympy",
-	"pymoos>=2021.1; sys_platform == 'linux' or sys_platform == 'darwin'"
+	"pymoos>=2021.1; sys_platform == 'linux' or sys_platform == 'darwin'",
+	"pyzmq"
 ]
 
 [project.optional-dependencies]
