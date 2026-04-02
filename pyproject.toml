@@ -60,7 +60,8 @@ dependencies = [
 	"shapely",
 	"sympy",
 	"pymoos>=2021.1; sys_platform == 'linux' or sys_platform == 'darwin'",
-	"pyzmq"
+	"pyzmq",
+	"ray[rllib]"
 ]
 
 [project.optional-dependencies]
