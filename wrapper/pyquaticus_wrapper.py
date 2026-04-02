@@ -64,7 +64,7 @@ class PyquaticusWrapper:
         }
 
         for agent_id, entry in self.agent_map.items():
-            if entry.agent_type == "heuristic":
+            if entry is not None and entry.agent_type == "heuristic":
                 agent_idx = int(agent_id.split("_")[1])
                 team = Team.BLUE_TEAM if agent_idx < self.team_size else Team.RED_TEAM
                 policy_class = policy_map[entry.label]
@@ -111,12 +111,13 @@ class PyquaticusWrapper:
         self.env.close()
 
     #Saves trajectory to npz file
-    def save(self, filename = "test_run"):
+    def save(self, filename = "test_run", tag = "NoTag"):
         folder = os.path.join(os.path.dirname(__file__), "../data/sessions")
         os.makedirs(folder, exist_ok=True)
         
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(folder, f"{filename}_{timestamp}.npz")
+        save_path = os.path.join(folder, f"{filename}_{tag}_{timestamp}.npz")
 
         np.savez_compressed(save_path, data=self.trajectory)
         print(f"Saved gameplay data to {save_path}")
+        return save_path
