@@ -75,7 +75,7 @@ class PyquaticusWrapper:
                     aquaticus_field_points=self.env.aquaticus_field_points, 
                 )
 
-    def run(self, max_steps = 500):
+    def run(self, max_steps = 500): #setting 100 for testing, 500 for normal runs, can be adjusted as needed
         obs, info = self.env.reset()
 
         for step in range(max_steps):
