@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import numpy as np
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog, QMessageBox, QInputDialog
@@ -69,9 +70,8 @@ class Data_Dashboard(QMainWindow):
 
         collected_title = self.create_section_title("Recently Collected")
 
-        # TODO: ADD function to export selected
-        collected_export = self.create_button("Export", None)
-        collected_delete = self.create_button("Delete", None)
+        collected_export = self.create_button("Export", self.export_valid)
+        collected_delete = self.create_button("Delete", self.delete_valid)
 
         layout_h_collected_buttons.addWidget(collected_delete)
         layout_h_collected_buttons.addWidget(collected_export)
@@ -82,7 +82,7 @@ class Data_Dashboard(QMainWindow):
         
         # Collected Data Table 
         collected_table_header = self.create_table_row(["Name", "Time", "Tag", "Selected"])
-        self.collected_table_content = self.create_table_content(valid_data)
+        self.collected_table_content, self.valid_checkboxes = self.create_table_content(valid_data)
 
         self.layout_v_collected.addLayout(layout_h_collected_title)
         self.layout_v_collected.addWidget(collected_table_header)
@@ -98,9 +98,8 @@ class Data_Dashboard(QMainWindow):
 
         invalid_title = self.create_section_title("Invalid Data")    
 
-        # TODO: ADD function to export selected
-        invalid_export = self.create_button("Export", None)
-        invalid_delete = self.create_button("Keep", None)
+        invalid_export = self.create_button("Export", self.export_invalid)
+        invalid_delete = self.create_button("Delete", self.delete_invalid)
 
         layout_h_invalid_buttons.addWidget(invalid_delete)
         layout_h_invalid_buttons.addWidget(invalid_export)
@@ -111,7 +110,7 @@ class Data_Dashboard(QMainWindow):
         
         # invalid Data Table 
         invalid_table_header = self.create_table_row(["Name", "Time", "Error", "Selected"])
-        self.invalid_table_content = self.create_table_content(invalid_data)
+        self.invalid_table_content, self.invalid_checkboxes = self.create_table_content(invalid_data)
 
         self.layout_v_invalid.addLayout(layout_h_invalid_title)
         self.layout_v_invalid.addWidget(invalid_table_header)
@@ -139,10 +138,10 @@ class Data_Dashboard(QMainWindow):
         recording = QLabel("Recording Status")
         recording.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
 
-        # TODO: Add option to toggle on and off
-        recording_button = self.create_button("Recording", None, 100, 40, DEFAULT_FONT_SIZE)
+        self.is_recording = True
+        self.recording_button = self.create_button("Recording: ON", self.toggle_recording, 130, 40, DEFAULT_FONT_SIZE)
         layout_h_settings_recording.addWidget(recording)
-        layout_h_settings_recording.addWidget(recording_button)
+        layout_h_settings_recording.addWidget(self.recording_button)
 
         layout_v_settings.addWidget(setting_title)
         layout_v_settings.addLayout(layout_h_settings_tag)
@@ -393,9 +392,13 @@ class Data_Dashboard(QMainWindow):
         wrapper.launch_env()
         wrapper.run(max_steps = 300)
         
-        tag = self.tag_input.text().strip() or "NoTag"
-        wrapper.save("test_run", tag)
-        self.refresh_tables()
+        if self.is_recording:
+            tag = self.tag_input.text().strip() or "NoTag"
+            wrapper.save("test_run", tag)
+            self.refresh_tables()
+            QMessageBox.information(self, "Game Finished", "Game run completed and data was saved successfully.")
+        else:
+            QMessageBox.information(self, "Game Finished", "Game run completed. Recording was disabled, so no data was saved.")
 
     # Function to create stat card
     def create_stat_card(self, title, value, data_type):
@@ -428,6 +431,7 @@ class Data_Dashboard(QMainWindow):
         layout = QHBoxLayout(header)
         layout.setContentsMargins(5, (15 if selectable else 10), 5, (15 if selectable else 10))
 
+        checkbox_widget = None
         for i, text in enumerate(labels):
             container = QWidget()
             column_layout = QHBoxLayout(container)
@@ -436,6 +440,7 @@ class Data_Dashboard(QMainWindow):
             # Add check box to the last element if allowed
             if (i == len(labels) - 1 and selectable):
                 checkbox = QCheckBox()
+                checkbox_widget = checkbox
                 checkbox.setCursor(QCursor(Qt.PointingHandCursor))
                 column_layout.setContentsMargins(0, 0, 30, 0)
                 column_layout.addWidget(checkbox, alignment=Qt.AlignRight | Qt.AlignVCenter)
@@ -458,7 +463,8 @@ class Data_Dashboard(QMainWindow):
         
             layout.addWidget(container, stretch = 1)
 
-
+        if selectable:
+            return header, checkbox_widget
         return header
     
     # Create table content
@@ -475,8 +481,14 @@ class Data_Dashboard(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
+        checkboxes = {}
         for i, (name, time, tag) in enumerate(content):
-            row = self.create_table_row([name, time, tag, ""], True)
+            row_result = self.create_table_row([name, time, tag, ""], True)
+            if isinstance(row_result, tuple):
+                row, checkbox = row_result
+                checkboxes[name] = checkbox
+            else:
+                row = row_result
             layout.addWidget(row)
 
             if i % 2 == 0:
@@ -485,7 +497,16 @@ class Data_Dashboard(QMainWindow):
                 row.setStyleSheet(f"background-color: {SECONDARY_SHADE_TWO}; border-radius: 4px; font-weight: 600")
         
         layout.addStretch()
-        return container
+        return container, checkboxes
+
+    def toggle_recording(self):
+        self.is_recording = not self.is_recording
+        if self.is_recording:
+            self.recording_button.setText("Recording: ON")
+            self.recording_button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; font-weight: 500;")
+        else:
+            self.recording_button.setText("Recording: OFF")
+            self.recording_button.setStyleSheet(f"background: {SECONDARY_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; font-weight: 500;")
 
 
     # Generate Default button
@@ -495,7 +516,8 @@ class Data_Dashboard(QMainWindow):
         button.setFixedHeight(height)
         button.setCursor(QCursor(Qt.PointingHandCursor))
         button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {textSize}; font-weight: 500;")
-        # button.clicked.connect(on_click)
+        if on_click:
+            button.clicked.connect(on_click)
         return button
 
 
@@ -508,13 +530,58 @@ class Data_Dashboard(QMainWindow):
         
         self.layout_v_collected.removeWidget(self.collected_table_content)
         self.collected_table_content.deleteLater()
-        self.collected_table_content = self.create_table_content(valid_data)
+        self.collected_table_content, self.valid_checkboxes = self.create_table_content(valid_data)
         self.layout_v_collected.addWidget(self.collected_table_content)
         
         self.layout_v_invalid.removeWidget(self.invalid_table_content)
         self.invalid_table_content.deleteLater()
-        self.invalid_table_content = self.create_table_content(invalid_data)
+        self.invalid_table_content, self.invalid_checkboxes = self.create_table_content(invalid_data)
         self.layout_v_invalid.addWidget(self.invalid_table_content)
+
+    def delete_data(self, checkboxes):
+        files_to_delete = [name for name, cb in checkboxes.items() if cb.isChecked()]
+        if not files_to_delete:
+            QMessageBox.information(self, "No Selection", "Please select at least one item to delete.")
+            return
+
+        reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete {len(files_to_delete)} items?", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
+            for name in files_to_delete:
+                file_path = os.path.join(sessions_dir, name)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            self.refresh_tables()
+
+    def export_data(self, checkboxes):
+        files_to_export = [name for name, cb in checkboxes.items() if cb.isChecked()]
+        if not files_to_export:
+            QMessageBox.information(self, "No Selection", "Please select at least one item to export.")
+            return
+
+        export_dir = QFileDialog.getExistingDirectory(self, "Select Export Directory")
+        if not export_dir:
+            return
+
+        sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
+        for name in files_to_export:
+            src_path = os.path.join(sessions_dir, name)
+            dst_path = os.path.join(export_dir, name)
+            if os.path.exists(src_path):
+                shutil.copy2(src_path, dst_path)
+        QMessageBox.information(self, "Export Successful", f"Successfully exported {len(files_to_export)} items.")
+
+    def delete_valid(self):
+        self.delete_data(self.valid_checkboxes)
+
+    def export_valid(self):
+        self.export_data(self.valid_checkboxes)
+
+    def delete_invalid(self):
+        self.delete_data(self.invalid_checkboxes)
+
+    def export_invalid(self):
+        self.export_data(self.invalid_checkboxes)
 
     def get_data_from_disk(self):
         sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
