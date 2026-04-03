@@ -1,6 +1,8 @@
 import sys
 import os
+import shutil
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import numpy as np
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog, QMessageBox, QInputDialog
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
@@ -47,10 +49,12 @@ class Data_Dashboard(QMainWindow):
         title.setStyleSheet(f"font-size: {LARGE_FONT_SIZE}; font-weight: 700; color: {PRIMARY_COLOR}")
         layout.addWidget(title, alignment = Qt.AlignTop)
         layout.addSpacing(SPACING)
-        
+         
+        valid_data, invalid_data = self.get_data_from_disk()
+
         # Stats Cards
-        total_collected_card = self.create_stat_card("Total Collected Data", 0, "Games")
-        invalid_collected_card = self.create_stat_card("Total Invalid Data", 0, "Invalid")
+        total_collected_card, self.total_label = self.create_stat_card("Total Collected Data", len(valid_data), "Games")
+        invalid_collected_card, self.invalid_label = self.create_stat_card("Total Invalid Data", len(invalid_data), "Invalid")
         layout_h_card = QHBoxLayout()
         layout_h_card.setSpacing(10)
         layout_h_card.addWidget(total_collected_card)
@@ -59,16 +63,15 @@ class Data_Dashboard(QMainWindow):
 
         # Valid collected data
         layout.addSpacing(SPACING)
-        layout_v_collected = QVBoxLayout()
-        layout_v_collected.setSpacing(10)
+        self.layout_v_collected = QVBoxLayout()
+        self.layout_v_collected.setSpacing(10)
         layout_h_collected_title = QHBoxLayout()
         layout_h_collected_buttons = QHBoxLayout()
 
         collected_title = self.create_section_title("Recently Collected")
 
-        # TODO: ADD function to export selected
-        collected_export = self.create_button("Export", None)
-        collected_delete = self.create_button("Delete", None)
+        collected_export = self.create_button("Export", self.export_valid)
+        collected_delete = self.create_button("Delete", self.delete_valid)
 
         layout_h_collected_buttons.addWidget(collected_delete)
         layout_h_collected_buttons.addWidget(collected_export)
@@ -79,25 +82,24 @@ class Data_Dashboard(QMainWindow):
         
         # Collected Data Table 
         collected_table_header = self.create_table_row(["Name", "Time", "Tag", "Selected"])
-        collected_table_content = self.create_table_content(self.get_colleceted_data())
+        self.collected_table_content, self.valid_checkboxes = self.create_table_content(valid_data)
 
-        layout_v_collected.addLayout(layout_h_collected_title)
-        layout_v_collected.addWidget(collected_table_header)
-        layout_v_collected.addWidget(collected_table_content)
-        layout.addLayout(layout_v_collected)
+        self.layout_v_collected.addLayout(layout_h_collected_title)
+        self.layout_v_collected.addWidget(collected_table_header)
+        self.layout_v_collected.addWidget(self.collected_table_content)
+        layout.addLayout(self.layout_v_collected)
 
         # Invalid data
         layout.addSpacing(SPACING)
-        layout_v_invalid = QVBoxLayout()
-        layout_v_invalid.setSpacing(10)
+        self.layout_v_invalid = QVBoxLayout()
+        self.layout_v_invalid.setSpacing(10)
         layout_h_invalid_title = QHBoxLayout()
         layout_h_invalid_buttons = QHBoxLayout()
 
         invalid_title = self.create_section_title("Invalid Data")    
 
-        # TODO: ADD function to export selected
-        invalid_export = self.create_button("Export", None)
-        invalid_delete = self.create_button("Keep", None)
+        invalid_export = self.create_button("Export", self.export_invalid)
+        invalid_delete = self.create_button("Delete", self.delete_invalid)
 
         layout_h_invalid_buttons.addWidget(invalid_delete)
         layout_h_invalid_buttons.addWidget(invalid_export)
@@ -108,12 +110,12 @@ class Data_Dashboard(QMainWindow):
         
         # invalid Data Table 
         invalid_table_header = self.create_table_row(["Name", "Time", "Error", "Selected"])
-        invalid_table_content = self.create_table_content(self.get_invalid_data())
+        self.invalid_table_content, self.invalid_checkboxes = self.create_table_content(invalid_data)
 
-        layout_v_invalid.addLayout(layout_h_invalid_title)
-        layout_v_invalid.addWidget(invalid_table_header)
-        layout_v_invalid.addWidget(invalid_table_content)
-        layout.addLayout(layout_v_invalid)
+        self.layout_v_invalid.addLayout(layout_h_invalid_title)
+        self.layout_v_invalid.addWidget(invalid_table_header)
+        self.layout_v_invalid.addWidget(self.invalid_table_content)
+        layout.addLayout(self.layout_v_invalid)
 
         # Settings
         layout.addSpacing(SPACING)
@@ -126,20 +128,20 @@ class Data_Dashboard(QMainWindow):
         
         tag = QLabel("Gameplay Tag")
         tag.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
-        tag_input = QLineEdit()
-        tag_input.setPlaceholderText("Enter Tag Name")
-        tag_input.setStyleSheet(f"background: {ALT_TEXT_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; border: 1px solid {PRIMARY_COLOR}; font-size: {DEFAULT_FONT_SIZE}; padding: 0px 5px 0px 5px")
-        tag_input.setFixedHeight(40)
+        self.tag_input = QLineEdit()
+        self.tag_input.setPlaceholderText("Enter Tag Name")
+        self.tag_input.setStyleSheet(f"background: {ALT_TEXT_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; border: 1px solid {PRIMARY_COLOR}; font-size: {DEFAULT_FONT_SIZE}; padding: 0px 5px 0px 5px")
+        self.tag_input.setFixedHeight(40)
         layout_h_settings_tag.addWidget(tag, stretch=1)
-        layout_h_settings_tag.addWidget(tag_input, stretch=1)
+        layout_h_settings_tag.addWidget(self.tag_input, stretch=1)
 
         recording = QLabel("Recording Status")
         recording.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
 
-        # TODO: Add option to toggle on and off
-        recording_button = self.create_button("Recording", None, 100, 40, DEFAULT_FONT_SIZE)
+        self.is_recording = True
+        self.recording_button = self.create_button("Recording: ON", self.toggle_recording, 130, 40, DEFAULT_FONT_SIZE)
         layout_h_settings_recording.addWidget(recording)
-        layout_h_settings_recording.addWidget(recording_button)
+        layout_h_settings_recording.addWidget(self.recording_button)
 
         layout_v_settings.addWidget(setting_title)
         layout_v_settings.addLayout(layout_h_settings_tag)
@@ -382,16 +384,21 @@ class Data_Dashboard(QMainWindow):
     def start_game(self):
         from wrapper.pyquaticus_wrapper import PyquaticusWrapper
 
-        if len(self.agent_policies) < 6: 
+        if any(policy is None for policy in self.agent_policies.values()):
             QMessageBox.warning(self, "Missing Policies", "Please assign a policy to all agents before starting.")
             return
         
         wrapper = PyquaticusWrapper(agent_map=self.agent_policies, team_size = 3)
         wrapper.launch_env()
-        self.close() #TEMPORARY NEED TO REMOVE 
         wrapper.run(max_steps = 300)
-        wrapper.save("test_run")
-
+        
+        if self.is_recording:
+            tag = self.tag_input.text().strip() or "NoTag"
+            wrapper.save("test_run", tag)
+            self.refresh_tables()
+            QMessageBox.information(self, "Game Finished", "Game run completed and data was saved successfully.")
+        else:
+            QMessageBox.information(self, "Game Finished", "Game run completed. Recording was disabled, so no data was saved.")
 
     # Function to create stat card
     def create_stat_card(self, title, value, data_type):
@@ -404,12 +411,12 @@ class Data_Dashboard(QMainWindow):
         title = QLabel(title)
         title.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE};")
 
-        value = QLabel(f"{value} {data_type}")
-        value.setStyleSheet(f"font-size: {LARGE_FONT_SIZE}; font-weight: 500")
+        value_label = QLabel(f"{value} {data_type}")
+        value_label.setStyleSheet(f"font-size: {LARGE_FONT_SIZE}; font-weight: 500")
 
         layout.addWidget(title)
-        layout.addWidget(value)
-        return card
+        layout.addWidget(value_label)
+        return card, value_label
 
     # Create section title
     def create_section_title(self, title):
@@ -424,6 +431,7 @@ class Data_Dashboard(QMainWindow):
         layout = QHBoxLayout(header)
         layout.setContentsMargins(5, (15 if selectable else 10), 5, (15 if selectable else 10))
 
+        checkbox_widget = None
         for i, text in enumerate(labels):
             container = QWidget()
             column_layout = QHBoxLayout(container)
@@ -432,6 +440,7 @@ class Data_Dashboard(QMainWindow):
             # Add check box to the last element if allowed
             if (i == len(labels) - 1 and selectable):
                 checkbox = QCheckBox()
+                checkbox_widget = checkbox
                 checkbox.setCursor(QCursor(Qt.PointingHandCursor))
                 column_layout.setContentsMargins(0, 0, 30, 0)
                 column_layout.addWidget(checkbox, alignment=Qt.AlignRight | Qt.AlignVCenter)
@@ -454,7 +463,8 @@ class Data_Dashboard(QMainWindow):
         
             layout.addWidget(container, stretch = 1)
 
-
+        if selectable:
+            return header, checkbox_widget
         return header
     
     # Create table content
@@ -471,8 +481,14 @@ class Data_Dashboard(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
+        checkboxes = {}
         for i, (name, time, tag) in enumerate(content):
-            row = self.create_table_row([name, time, tag, ""], True)
+            row_result = self.create_table_row([name, time, tag, ""], True)
+            if isinstance(row_result, tuple):
+                row, checkbox = row_result
+                checkboxes[name] = checkbox
+            else:
+                row = row_result
             layout.addWidget(row)
 
             if i % 2 == 0:
@@ -481,7 +497,16 @@ class Data_Dashboard(QMainWindow):
                 row.setStyleSheet(f"background-color: {SECONDARY_SHADE_TWO}; border-radius: 4px; font-weight: 600")
         
         layout.addStretch()
-        return container
+        return container, checkboxes
+
+    def toggle_recording(self):
+        self.is_recording = not self.is_recording
+        if self.is_recording:
+            self.recording_button.setText("Recording: ON")
+            self.recording_button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; font-weight: 500;")
+        else:
+            self.recording_button.setText("Recording: OFF")
+            self.recording_button.setStyleSheet(f"background: {SECONDARY_COLOR}; border-radius: 4px; color: {TEXT_COLOR}; font-size: {DEFAULT_FONT_SIZE}; font-weight: 500;")
 
 
     # Generate Default button
@@ -491,31 +516,110 @@ class Data_Dashboard(QMainWindow):
         button.setFixedHeight(height)
         button.setCursor(QCursor(Qt.PointingHandCursor))
         button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {textSize}; font-weight: 500;")
-        # button.clicked.connect(on_click)
+        if on_click:
+            button.clicked.connect(on_click)
         return button
 
 
-    # TODO: Update method to get data
-    def get_colleceted_data(self):
-        data = [
-        ["Game_1", "30:20", "D&C"],
-        ["Game_2", "30:20", "D&C"],
-        ["Game_3",  "30:20", "D&C"],
-        ["Game_4", "30:20", "D&C"],
-        ["Game_5", "30:20", "D&C"],
-        ]
-        return data
-    
-    # TODO: Update method to get data
-    def get_invalid_data(self):
-        data = [
-        ["Game_1", "30:20", "Corrupt"],
-        ["Game_2", "30:20", "Corrupt"],
-        ["Game_3",  "30:20", "Corrupt"],
-        ["Game_4", "30:20", "Corrupt"],
-        ["Game_5", "30:20", "Corrupt"],
-        ]
-        return data
+    # Update method to get data
+    def refresh_tables(self):
+        valid_data, invalid_data = self.get_data_from_disk()
+        
+        self.total_label.setText(f"{len(valid_data)} Games")
+        self.invalid_label.setText(f"{len(invalid_data)} Invalid")
+        
+        self.layout_v_collected.removeWidget(self.collected_table_content)
+        self.collected_table_content.deleteLater()
+        self.collected_table_content, self.valid_checkboxes = self.create_table_content(valid_data)
+        self.layout_v_collected.addWidget(self.collected_table_content)
+        
+        self.layout_v_invalid.removeWidget(self.invalid_table_content)
+        self.invalid_table_content.deleteLater()
+        self.invalid_table_content, self.invalid_checkboxes = self.create_table_content(invalid_data)
+        self.layout_v_invalid.addWidget(self.invalid_table_content)
+
+    def delete_data(self, checkboxes):
+        files_to_delete = [name for name, cb in checkboxes.items() if cb.isChecked()]
+        if not files_to_delete:
+            QMessageBox.information(self, "No Selection", "Please select at least one item to delete.")
+            return
+
+        reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete {len(files_to_delete)} items?", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
+            for name in files_to_delete:
+                file_path = os.path.join(sessions_dir, name)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            self.refresh_tables()
+
+    def export_data(self, checkboxes):
+        files_to_export = [name for name, cb in checkboxes.items() if cb.isChecked()]
+        if not files_to_export:
+            QMessageBox.information(self, "No Selection", "Please select at least one item to export.")
+            return
+
+        export_dir = QFileDialog.getExistingDirectory(self, "Select Export Directory")
+        if not export_dir:
+            return
+
+        sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
+        for name in files_to_export:
+            src_path = os.path.join(sessions_dir, name)
+            dst_path = os.path.join(export_dir, name)
+            if os.path.exists(src_path):
+                shutil.copy2(src_path, dst_path)
+        QMessageBox.information(self, "Export Successful", f"Successfully exported {len(files_to_export)} items.")
+
+    def delete_valid(self):
+        self.delete_data(self.valid_checkboxes)
+
+    def export_valid(self):
+        self.export_data(self.valid_checkboxes)
+
+    def delete_invalid(self):
+        self.delete_data(self.invalid_checkboxes)
+
+    def export_invalid(self):
+        self.export_data(self.invalid_checkboxes)
+
+    def get_data_from_disk(self):
+        sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
+        if not os.path.exists(sessions_dir):
+            return [], []
+            
+        valid_data = []
+        invalid_data = []
+        
+        for f in reversed(sorted(os.listdir(sessions_dir))):
+            if f.endswith(".npz"):
+                parts = f.replace(".npz", "").split("_")
+                name = f
+                time_str = "Unknown"
+                tag = "None"
+                error = "Corrupted"
+                
+                if len(parts) >= 4:
+                    tag = parts[-3]
+                    time_str = f"{parts[-2][:4]}-{parts[-2][4:6]}-{parts[-2][6:]} {parts[-1][:2]}:{parts[-1][2:4]}"
+                
+                file_path = os.path.join(sessions_dir, f)
+                is_valid = False
+                try:
+                    with np.load(file_path, allow_pickle=True) as data:
+                        if 'data' in data and len(data['data']) > 0:
+                            is_valid = True
+                        else:
+                            error = "Empty Trajectory"
+                except Exception:
+                    error = "Load Failed"
+                
+                if is_valid:
+                    valid_data.append([name, time_str, tag])
+                else:
+                    invalid_data.append([name, time_str, error])
+                    
+        return valid_data, invalid_data
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

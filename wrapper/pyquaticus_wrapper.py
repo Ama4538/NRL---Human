@@ -63,9 +63,7 @@ class PyquaticusWrapper:
         }
 
         for agent_id, entry in self.agent_map.items():
-            if entry is None:
-                continue
-            if entry.agent_type == "heuristic":
+            if entry is not None and entry.agent_type == "heuristic":
                 agent_idx = int(agent_id.split("_")[1])
                 team = Team.BLUE_TEAM if agent_idx < self.team_size else Team.RED_TEAM
                 policy_class = policy_map[entry.label]
@@ -76,7 +74,7 @@ class PyquaticusWrapper:
                     aquaticus_field_points=self.env.aquaticus_field_points, 
                 )
 
-    def run(self, max_steps = 500):
+    def run(self, max_steps = 500): #setting 100 for testing, 500 for normal runs, can be adjusted as needed
         obs, info = self.env.reset()
 
         for step in range(max_steps):
@@ -136,12 +134,11 @@ class PyquaticusWrapper:
         return True, ""
 
     # Saves trajectory to npz file
-    def save(self, filename="test_run"):
+    def save(self, filename="test_run",tag = "NoTag"):
         folder = os.path.join(os.path.dirname(__file__), "../data/sessions")
         os.makedirs(folder, exist_ok=True)
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
         ok, reason = self.validate_agent_completeness()
         if not ok:
             quarantine = os.path.join(folder, "quarantine")
