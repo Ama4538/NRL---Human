@@ -2,9 +2,6 @@ import numpy as np
 import time
 import datetime
 import os
-from pyquaticus import pyquaticus_v0
-from pyquaticus.config import config_dict_std 
-from pyquaticus.base_policies.key_agent import KeyAgent
 
 class AgentController:
     def __init__(self, agent_type: str, controller, agent_id, label: str = ""):
@@ -42,10 +39,12 @@ class PyquaticusWrapper:
         return curr_agent.get_action(obs, info)
 
     def launch_env(self):
+        from pyquaticus import pyquaticus_v0
+        from pyquaticus.config import config_dict_std
         config = config_dict_std.copy()
-        
+
         config['sim_speedup_factor'] = 2
-        
+
         self.env = pyquaticus_v0.PyQuaticusEnv(
             config_dict = config,
             render_mode = self.render_mode,
@@ -64,6 +63,8 @@ class PyquaticusWrapper:
         }
 
         for agent_id, entry in self.agent_map.items():
+            if entry is None:
+                continue
             if entry.agent_type == "heuristic":
                 agent_idx = int(agent_id.split("_")[1])
                 team = Team.BLUE_TEAM if agent_idx < self.team_size else Team.RED_TEAM
