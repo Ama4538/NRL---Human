@@ -2,9 +2,6 @@ import numpy as np
 import time
 import datetime
 import os
-from pyquaticus import pyquaticus_v0
-from pyquaticus.config import config_dict_std 
-from pyquaticus.base_policies.key_agent import KeyAgent
 
 class AgentController:
     def __init__(self, agent_type: str, controller, agent_id, label: str = ""):
@@ -42,10 +39,12 @@ class PyquaticusWrapper:
         return curr_agent.get_action(obs, info)
 
     def launch_env(self):
+        from pyquaticus import pyquaticus_v0
+        from pyquaticus.config import config_dict_std
         config = config_dict_std.copy()
-        
+
         config['sim_speedup_factor'] = 2
-        
+
         self.env = pyquaticus_v0.PyQuaticusEnv(
             config_dict = config,
             render_mode = self.render_mode,
@@ -110,14 +109,50 @@ class PyquaticusWrapper:
 
         self.env.close()
 
-    #Saves trajectory to npz file
-    def save(self, filename = "test_run", tag = "NoTag"):
+    def _expected_agent_ids(self):
+        return {f"agent_{i}" for i in range(2 * self.team_size)}
+
+    def _found_agent_ids_from_trajectory(self):
+        found = set()
+        for step in self.trajectory:
+            obs = step.get("obs", {})
+            if isinstance(obs, dict):
+                found.update(obs.keys())
+        return found
+
+    def validate_agent_completeness(self):
+        expected = self._expected_agent_ids()
+        found = self._found_agent_ids_from_trajectory()
+        missing = sorted(expected - found)
+
+        if missing:
+            reason = (
+                f"AGENT_COUNT_MISMATCH expected={len(expected)} found={len(found)}; "
+                f"MISSING_AGENT_DATA: {', '.join(missing)}"
+            )
+            return False, reason
+        return True, ""
+
+    # Saves trajectory to npz file
+    def save(self, filename="test_run",tag = "NoTag"):
         folder = os.path.join(os.path.dirname(__file__), "../data/sessions")
         os.makedirs(folder, exist_ok=True)
-        
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(folder, f"{filename}_{tag}_{timestamp}.npz")
 
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        ok, reason = self.validate_agent_completeness()
+        if not ok:
+            quarantine = os.path.join(folder, "quarantine")
+            os.makedirs(quarantine, exist_ok=True)
+
+            save_path = os.path.join(quarantine, f"{filename}_{timestamp}.npz")
+            np.savez_compressed(save_path, data=self.trajectory, error=reason)
+
+            print(f"[QUARANTINED] Saved INVALID gameplay data to {save_path}")
+            print(f"[REASON] {reason}")
+            return save_path, False, reason
+
+        save_path = os.path.join(folder, f"{filename}_{timestamp}.npz")
         np.savez_compressed(save_path, data=self.trajectory)
+
         print(f"Saved gameplay data to {save_path}")
-        return save_path
+        return save_path, True, ""
