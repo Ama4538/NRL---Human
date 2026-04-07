@@ -366,6 +366,9 @@ class Data_Dashboard(QMainWindow):
         except Exception as e:
             load_button.setText("Load Policy")
             print(f"Error Loading Agent {agent_idx}")
+            print(e)
+            import traceback
+            traceback.print_exc()
 
 
     def update_load_button(self, agent_idx, dropdown):

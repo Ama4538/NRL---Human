@@ -30,6 +30,7 @@ def load_latest_policy(policy_folder_name):
     print(f"Loading RLlib policy from {checkpoint_path}")
     return Policy.from_checkpoint(checkpoint_path)
 
+
 key_agent = KeyAgent()
 #policy_1 = Policy.from_checkpoint(os.path.dirname(__file__), "agent-1-policy")
 #policy_2 = Policy.from_checkpoint(os.path.dirname(__file__), "agent-2-policy")
