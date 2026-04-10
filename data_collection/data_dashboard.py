@@ -168,6 +168,7 @@ class Data_Dashboard(QMainWindow):
 
         self.agent_dropdowns = {}
         self.agent_load_buttons = {}
+        self.agent_status_labels = {}
 
         for i in range(TOTAL_AGENT):
             self.add_agent_row(i, agent_layout)
@@ -260,8 +261,16 @@ class Data_Dashboard(QMainWindow):
         self.agent_load_buttons[agent_idx] = load_button
 
         load_button.clicked.connect(lambda _, idx=agent_idx: self.load_policy(idx, load_button))
-        
+
         row_layout.addWidget(load_button)
+        
+        status_label = QLabel("Not Loaded")
+        status_label.setStyleSheet(f"font-size: {MED_FONT_SIZE}px; color: {TEXT_COLOR};")
+        self.agent_status_labels[agent_idx] = status_label
+
+        row_layout.addWidget(status_label)
+
+
 
         parent_layout.addLayout(row_layout)
 
@@ -308,7 +317,7 @@ class Data_Dashboard(QMainWindow):
             if selection == "Human (Keyboard)":
                 from pyquaticus.base_policies.key_agent import KeyAgent
                 self.agent_policies[agent_key] = AgentController("keyboard", KeyAgent(), agent_key) 
-                print(f"Agent {agent_idx} assigned to Human (Keyboard).")
+                self.agent_status_labels[agent_idx].setText(f"Agent {agent_idx} assigned to Human (Keyboard).")
 
             elif selection == "Heuristic":
                 heuristic_type, ok = QInputDialog.getItem(
@@ -336,7 +345,7 @@ class Data_Dashboard(QMainWindow):
                 #controller = policy_map[heuristic_type]()
 
                 self.agent_policies[agent_key] = AgentController("heuristic", None, agent_key, label=heuristic_type)
-                print(f"Agent {agent_idx} assigned to Heuristic: {heuristic_type}")
+                self.agent_status_labels[agent_idx].setText(f"Agent {agent_idx} assigned to Heuristic: {heuristic_type}")
 
             elif selection == "Trained Policy":
             
@@ -360,7 +369,8 @@ class Data_Dashboard(QMainWindow):
                 from ray.rllib.policy.policy import Policy
                 policy = Policy.from_checkpoint(policy_dir)
                 self.agent_policies[agent_key] = AgentController("rl", policy, agent_key, label = policy_dir)
-                print(f"Agent {agent_idx} policy set to: {policy_dir}")
+                checkpoint_name = os.path.basename(policy_dir)
+                self.agent_status_labels[agent_idx].setText(f"Agent {agent_idx} policy set to: {checkpoint_name}")
             
             else:
                 load_button.setText("Load Policy")
