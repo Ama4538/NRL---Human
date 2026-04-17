@@ -185,6 +185,12 @@ class Data_Dashboard(QMainWindow):
         start_button.clicked.connect(self.start_game)
         layout.addWidget(start_button, stretch = 1)
 
+        # Replay Session Button
+        replay_button = self.create_button("Replay Session", None, 200, 50, MED_FONT_SIZE)
+        replay_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        replay_button.clicked.connect(self.replay_session)
+        layout.addWidget(replay_button, stretch=1)
+
         layout.addStretch()
 
     # Function to create agent dropdown menus
@@ -595,6 +601,19 @@ class Data_Dashboard(QMainWindow):
 
     def export_invalid(self):
         self.export_data(self.invalid_checkboxes)
+
+    def replay_session(self):
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Select Session to Replay",
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions")),
+            "NPZ Files (*.npz)"
+        )
+        if not filepath:
+            return
+        from wrapper.pyquaticus_wrapper import PyquaticusWrapper
+        wrapper = PyquaticusWrapper(agent_map={}, team_size=3)
+        self.close()
+        wrapper.replay(filepath)
 
     def get_data_from_disk(self):
         sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))

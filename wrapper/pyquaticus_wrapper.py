@@ -102,7 +102,7 @@ class PyquaticusWrapper:
 
             obs = next_obs
 
-            if any(term.values()) or any(trunc.values()):
+            if any(term.values()):
                 break
 
             #time.sleep(frame_delay)
@@ -132,6 +132,37 @@ class PyquaticusWrapper:
             )
             return False, reason
         return True, ""
+
+    def replay(self, filepath, frame_delay=0.05):
+        data = np.load(filepath, allow_pickle=True)
+        if "error" in data:
+            print(f"[WARNING] Replaying a QUARANTINED session: {data['error']}")
+        trajectory = list(data["data"])
+        if not trajectory:
+            print("[ERROR] No trajectory data found in file.")
+            return
+        self.launch_env()
+        self.env.reset()
+        import pygame
+        print(f"[REPLAY] Starting replay of {len(trajectory)} steps from {filepath}")
+        for i, step in enumerate(trajectory):
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.env.close()
+                    print("[REPLAY] Closed by user.")
+                    return
+            step = step.item() if hasattr(step, "item") else step
+            actions = step.get("actions", {})
+            self.env.step(actions)
+            self.env.render()
+            time.sleep(frame_delay)
+            term = step.get("term", {})
+            trunc = step.get("trunc", {})
+            if any(term.values()) or any(trunc.values()):
+                print(f"[REPLAY] Episode ended at step {i + 1}")
+                break
+        self.env.close()
+        print("[REPLAY] Done.")
 
     # Saves trajectory to npz file
     def save(self, filename="test_run",tag = "NoTag"):
