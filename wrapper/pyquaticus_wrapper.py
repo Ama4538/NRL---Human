@@ -155,7 +155,7 @@ class PyquaticusWrapper:
             actions = step.get("actions", {})
             self.env.step(actions)
             self.env.render()
-            time.sleep(frame_delay)
+            #time.sleep(frame_delay)
             term = step.get("term", {})
             trunc = step.get("trunc", {})
             if any(term.values()) or any(trunc.values()):

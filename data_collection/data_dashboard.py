@@ -461,6 +461,20 @@ class Data_Dashboard(QMainWindow):
                 checkbox = QCheckBox()
                 checkbox_widget = checkbox
                 checkbox.setCursor(QCursor(Qt.PointingHandCursor))
+                checkbox.setStyleSheet(f"""
+                    QCheckBox::indicator {{
+                        width: 18px;
+                        height: 18px;
+                        border: 2px solid {TEXT_COLOR};
+                        border-radius: 3px;
+                        background: transparent;
+                    }}
+
+                    QCheckBox::indicator:checked {{
+                        background: {ACCENT_COLOR};
+                        border: 2px solid {ACCENT_COLOR};
+                    }}
+                """)
                 column_layout.setContentsMargins(0, 0, 30, 0)
                 column_layout.addWidget(checkbox, alignment=Qt.AlignRight | Qt.AlignVCenter)
             else:
@@ -612,7 +626,7 @@ class Data_Dashboard(QMainWindow):
             return
         from wrapper.pyquaticus_wrapper import PyquaticusWrapper
         wrapper = PyquaticusWrapper(agent_map={}, team_size=3)
-        self.close()
+        #self.close()
         wrapper.replay(filepath)
 
     def get_data_from_disk(self):
