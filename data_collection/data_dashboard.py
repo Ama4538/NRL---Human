@@ -3,7 +3,7 @@ import os
 import shutil
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import numpy as np
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog, QMessageBox, QInputDialog
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton, QCheckBox, QScrollArea, QLineEdit, QSizePolicy, QComboBox, QFileDialog, QMessageBox, QInputDialog, QDialog
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
@@ -72,9 +72,11 @@ class Data_Dashboard(QMainWindow):
 
         collected_export = self.create_button("Export", self.export_valid)
         collected_delete = self.create_button("Delete", self.delete_valid)
+        collected_summary = self.create_button("Summary", self.show_summary)
 
         layout_h_collected_buttons.addWidget(collected_delete)
         layout_h_collected_buttons.addWidget(collected_export)
+        layout_h_collected_buttons.addWidget(collected_summary)
 
         layout_h_collected_title.addWidget(collected_title)
         layout_h_collected_title.addStretch()
@@ -162,13 +164,15 @@ class Data_Dashboard(QMainWindow):
         agent_layout.setContentsMargins(0, 0, 0, 0)
 
         agent_label = QLabel("Agent Policy Selection")
-        agent_label.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color {TEXT_COLOR}")
+        agent_label.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color: {TEXT_COLOR}")
         agent_layout.addWidget(agent_label)
         agent_layout.addSpacing(10)
 
         self.agent_dropdowns = {}
         self.agent_load_buttons = {}
         self.agent_status_labels = {}
+
+        agent_layout.setSpacing(8)
 
         for i in range(TOTAL_AGENT):
             self.add_agent_row(i, agent_layout)
@@ -197,7 +201,7 @@ class Data_Dashboard(QMainWindow):
     def add_agent_row(self, agent_idx, parent_layout): 
         row_layout = QHBoxLayout()
         label = QLabel(f"Agent {agent_idx}:")
-        label.setStyleSheet(f"font-size: {MED_FONT_SIZE}px; color: {TEXT_COLOR};")
+        label.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color: {TEXT_COLOR}; padding-left: 10px;")
         row_layout.addWidget(label)
 
         dropdown = QComboBox()
@@ -213,10 +217,12 @@ class Data_Dashboard(QMainWindow):
             QComboBox {{
                 background: {ALT_TEXT_COLOR};
                 color: {TEXT_COLOR};
-                border: 1px solid c;
+                border: 1px solid {SECONDARY_COLOR};
                 border-radius: 4px;
                 padding: 2px 5px;
                 min-height: 20px;
+                font-size: {DEFAULT_FONT_SIZE};
+                font-weight: 600;
             }}
             
             QComboBox[selected="true"] {{
@@ -520,6 +526,10 @@ class Data_Dashboard(QMainWindow):
             if isinstance(row_result, tuple):
                 row, checkbox = row_result
                 checkboxes[name] = checkbox
+                #Enforce single selection for summary info
+                checkbox.stateChanged.connect(
+                    lambda state, n=name: self.on_checkbox_selected(n)
+                )
             else:
                 row = row_result
             layout.addWidget(row)
@@ -531,6 +541,11 @@ class Data_Dashboard(QMainWindow):
         
         layout.addStretch()
         return container, checkboxes
+    
+    def on_checkbox_selected(self, selected_name):
+        for name, checkbox in self.valid_checkboxes.items():
+            if name != selected_name:
+                checkbox.setChecked(False)
 
     def toggle_recording(self):
         self.is_recording = not self.is_recording
@@ -604,11 +619,104 @@ class Data_Dashboard(QMainWindow):
                 shutil.copy2(src_path, dst_path)
         QMessageBox.information(self, "Export Successful", f"Successfully exported {len(files_to_export)} items.")
 
+    def show_summary(self):
+        #Find which file is selected 
+        selected_name = None
+        for name, checkbox in self.valid_checkboxes.items():
+            if checkbox.isChecked():
+                selected_name = name
+                break
+        if not selected_name:
+            return
+        sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
+        filepath = os.path.join(sessions_dir, selected_name)
+
+        # Generate summary
+        data = np.load(filepath, allow_pickle=True)
+        trajectory = list(data["data"])
+        total_steps = len(trajectory)
+
+        # Per agent reward totals and reward events
+        agent_totals = {}
+        reward_events = []
+        for step_idx, step in enumerate(trajectory):
+            step = step.item() if hasattr(step, "item") else step
+            for agent_id, reward in step["reward"].items():
+                agent_totals[agent_id] = agent_totals.get(agent_id, 0) + reward
+                if reward != 0.0:
+                    reward_events.append(f"  Step {step_idx}: {agent_id} received reward {reward}")
+
+        # Check if ended early
+        last_step = trajectory[-1].item() if hasattr(trajectory[-1], "item") else trajectory[-1]
+        terminated_early = any(last_step["term"].values()) or any(last_step["trunc"].values())
+        global_state = last_step["info"]["agent_0"]["global_state"]
+        blue_score = global_state["blue_team_score"]
+        red_score = global_state["red_team_score"]
+
+        if blue_score > red_score:
+            winner = "Blue Team"
+        elif red_score > blue_score:
+            winner = "Red Team"
+        else:
+            winner = "Tie"
+
+        #Load agent metadata if available
+        agent_metadata = None
+        if "agent_metadata" in data:
+            agent_metadata = data["agent_metadata"].item()
+
+        # Build summary text
+        summary = f"File: {selected_name}\n\n"
+        
+        summary += "=== RESULTS ===\n"
+        
+        summary += f"Winner: {winner}\n"
+        summary += f"Score: {blue_score} - {red_score}\n"
+
+        summary += f"Total Steps: {total_steps} ({'ended early' if terminated_early else 'full game'})\n\n"
+
+        summary += "=== AGENT CONFIGURATION ===\n"
+        if agent_metadata:
+            for agent_id, meta in agent_metadata.items():
+                team = "Blue" if int(agent_id.split("_")[1]) < 3 else "Red"
+                summary += f"  {agent_id} ({team}): {meta['agent_type']} — {meta['label']}\n"
+        else:
+            summary += "  No agent metadata recorded (older file)\n"
+        
+        summary += "\n=== AGENT REWARD SUMMARY ===\n"
+        for agent_id, total in agent_totals.items():
+            summary += f"  {agent_id}: {total:.2f} total reward\n"
+        
+        summary += "\n=== REWARD EVENTS ===\n"
+        if reward_events:
+            summary += "\n".join(reward_events)
+        else:
+            summary += "  No reward events recorded"
+
+        # Show popup
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Game Summary")
+        dialog.setMinimumWidth(400)
+        layout = QVBoxLayout(dialog)
+        
+        text = QLabel(summary)
+        text.setStyleSheet(f"font-size: {SMALL_FONT_SIZE}px; color: {TEXT_COLOR};")
+        text.setWordWrap(True)
+        
+        close_button = self.create_button("Close", None, 100, 35, MED_FONT_SIZE)
+        close_button.clicked.connect(dialog.close)
+        
+        layout.addWidget(text)
+        layout.addWidget(close_button)
+        dialog.exec()
+
     def delete_valid(self):
         self.delete_data(self.valid_checkboxes)
 
     def export_valid(self):
         self.export_data(self.valid_checkboxes)
+
+    
 
     def delete_invalid(self):
         self.delete_data(self.invalid_checkboxes)

@@ -170,20 +170,29 @@ class PyquaticusWrapper:
         os.makedirs(folder, exist_ok=True)
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        #Build agent metadata from agent_map
+        agent_metadata = {}
+        for agent_id, entry in self.agent_map.items():
+            agent_metadata[agent_id] = {
+                "agent_type": entry.agent_type,
+                "label": entry.label
+            }
+
         ok, reason = self.validate_agent_completeness()
         if not ok:
             quarantine = os.path.join(folder, "quarantine")
             os.makedirs(quarantine, exist_ok=True)
 
             save_path = os.path.join(quarantine, f"{filename}_{timestamp}.npz")
-            np.savez_compressed(save_path, data=self.trajectory, error=reason)
+            np.savez_compressed(save_path, data=self.trajectory, agent_metadata=np.array(agent_metadata, dtype=object), error=reason)
 
             print(f"[QUARANTINED] Saved INVALID gameplay data to {save_path}")
             print(f"[REASON] {reason}")
             return save_path, False, reason
 
         save_path = os.path.join(folder, f"{filename}_{timestamp}.npz")
-        np.savez_compressed(save_path, data=self.trajectory)
+        np.savez_compressed(save_path, data=self.trajectory, agent_metadata=np.array(agent_metadata, dtype=object))
 
         print(f"Saved gameplay data to {save_path}")
         return save_path, True, ""
