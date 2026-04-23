@@ -74,10 +74,19 @@ class PyquaticusWrapper:
                     aquaticus_field_points=self.env.aquaticus_field_points, 
                 )
 
-    def run(self, max_steps = 500): #setting 100 for testing, 500 for normal runs, can be adjusted as needed
+    def run(self): #setting 100 for testing, 500 for normal runs, can be adjusted as needed
+        import pygame
         obs, info = self.env.reset()
 
-        for step in range(max_steps):
+        step = 0
+
+        while True:
+            # Check for user closing the window
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    print("[GAME] Closed by user.")
+                    self.env.close()
+                    return
             
             actions = {}
 
@@ -101,8 +110,10 @@ class PyquaticusWrapper:
             })
 
             obs = next_obs
+            step += 1
 
-            if any(term.values()):
+            if any(term.values()) or any(trunc.values()):
+                print(f"[GAME OVER] Episode ended at step {step}")
                 break
 
             #time.sleep(frame_delay)

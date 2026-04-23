@@ -415,7 +415,7 @@ class Data_Dashboard(QMainWindow):
         
         wrapper = PyquaticusWrapper(agent_map=self.agent_policies, team_size = 3)
         wrapper.launch_env()
-        wrapper.run(max_steps = 300)
+        wrapper.run()
         
         if self.is_recording:
             tag = self.tag_input.text().strip() or "NoTag"
@@ -673,7 +673,7 @@ class Data_Dashboard(QMainWindow):
         summary += f"Winner: {winner}\n"
         summary += f"Score: {blue_score} - {red_score}\n"
 
-        summary += f"Total Steps: {total_steps} ({'ended early' if terminated_early else 'full game'})\n\n"
+        summary += f"Total Steps: {total_steps}\n\n"
 
         summary += "=== AGENT CONFIGURATION ===\n"
         if agent_metadata:
