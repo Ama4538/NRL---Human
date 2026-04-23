@@ -256,14 +256,18 @@ class Data_Dashboard(QMainWindow):
                 color: {ALT_TEXT_COLOR}; 
                 border: 1px solid {PRIMARY_COLOR}; 
                 border-radius: 4px; 
-                padding: 2px 5px; 
+                padding: 5px 10px; 
                 min-height: 20px;
+                font-size: {DEFAULT_FONT_SIZE};
+                font-weight: 600;
             }}
 
             QPushButton:disabled {{
                 background: {TINT_COLOR};       
                 color: {TEXT_COLOR};          
                 border: 1px solid {TEXT_COLOR};
+                font-size: {DEFAULT_FONT_SIZE};
+                font-weight: 600;
             }}
         """)
         load_button.setCursor(Qt.PointingHandCursor)
@@ -277,7 +281,9 @@ class Data_Dashboard(QMainWindow):
         row_layout.addWidget(load_button)
         
         status_label = QLabel("Not Loaded")
-        status_label.setStyleSheet(f"font-size: {MED_FONT_SIZE}px; color: {TEXT_COLOR};")
+        status_label.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color: {TEXT_COLOR}; padding-left: 10px;")
+        status_label.setFixedWidth(200)  # fix the width
+        status_label.setWordWrap(True)   # wrap text instead of expanding
         self.agent_status_labels[agent_idx] = status_label
 
         row_layout.addWidget(status_label)
