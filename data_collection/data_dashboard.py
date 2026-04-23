@@ -200,6 +200,8 @@ class Data_Dashboard(QMainWindow):
         start_button = self.create_button("Start Game", None, 200, 50, MED_FONT_SIZE)
         start_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         start_button.clicked.connect(self.start_game)
+        start_button.setEnabled(False)
+        self.start_button = start_button
         layout.addWidget(start_button, stretch = 1)
 
         # Replay Session Button
@@ -338,6 +340,11 @@ class Data_Dashboard(QMainWindow):
         
         return True
     
+    #Checks if all agents have a policy assigned before starting the game
+    def check_all_loaded(self):
+        if all(policy is not None for policy in self.agent_policies.values()):
+            self.start_button.setEnabled(True)
+        
     def load_policy(self, agent_idx, load_button):
         from wrapper.pyquaticus_wrapper import AgentController
         selection = self.agent_dropdowns[agent_idx].currentText()
@@ -412,6 +419,8 @@ class Data_Dashboard(QMainWindow):
             print(e)
             import traceback
             traceback.print_exc()
+
+        self.check_all_loaded()
 
 
     def update_load_button(self, agent_idx, dropdown):
