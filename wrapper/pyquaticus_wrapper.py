@@ -41,14 +41,19 @@ class PyquaticusWrapper:
     def launch_env(self):
         from pyquaticus import pyquaticus_v0
         from pyquaticus.config import config_dict_std
+        from .rewards import caps_and_grabs
+
         config = config_dict_std.copy()
 
         config['sim_speedup_factor'] = 2
+
+        reward_config = {agent_id: caps_and_grabs for agent_id in self.agent_map.keys()}
 
         self.env = pyquaticus_v0.PyQuaticusEnv(
             config_dict = config,
             render_mode = self.render_mode,
             team_size = self.team_size,
+            reward_config = reward_config
         )
 
         from pyquaticus.base_policies.deprecated.base_attack import BaseAttacker
