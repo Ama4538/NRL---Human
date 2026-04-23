@@ -697,16 +697,25 @@ class Data_Dashboard(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Game Summary")
         dialog.setMinimumWidth(400)
+        dialog.setMinimumHeight(400)
         layout = QVBoxLayout(dialog)
+
+        #Scroll
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("border: none;")
         
         text = QLabel(summary)
-        text.setStyleSheet(f"font-size: {SMALL_FONT_SIZE}px; color: {TEXT_COLOR};")
+        text.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color: {TEXT_COLOR};")
         text.setWordWrap(True)
+        text.setAlignment(Qt.AlignTop)
+
+        scroll.setWidget(text)
         
         close_button = self.create_button("Close", None, 100, 35, MED_FONT_SIZE)
         close_button.clicked.connect(dialog.close)
         
-        layout.addWidget(text)
+        layout.addWidget(scroll)
         layout.addWidget(close_button)
         dialog.exec()
 
