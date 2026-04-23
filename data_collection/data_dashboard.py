@@ -71,8 +71,16 @@ class Data_Dashboard(QMainWindow):
         collected_title = self.create_section_title("Recently Collected")
 
         collected_export = self.create_button("Export", self.export_valid)
+        collected_export.setEnabled(False)
+        self.collected_export_button = collected_export
+        
         collected_delete = self.create_button("Delete", self.delete_valid)
+        collected_delete.setEnabled(False)
+        self.collected_delete_button = collected_delete
+
         collected_summary = self.create_button("Summary", self.show_summary)
+        collected_summary.setEnabled(False)
+        self.collected_summary_button = collected_summary
 
         layout_h_collected_buttons.addWidget(collected_delete)
         layout_h_collected_buttons.addWidget(collected_export)
@@ -101,7 +109,12 @@ class Data_Dashboard(QMainWindow):
         invalid_title = self.create_section_title("Invalid Data")    
 
         invalid_export = self.create_button("Export", self.export_invalid)
+        invalid_export.setEnabled(False)
+        self.invalid_export_button = invalid_export
+        
         invalid_delete = self.create_button("Delete", self.delete_invalid)
+        invalid_delete.setEnabled(False)
+        self.invalid_delete_button = invalid_delete
 
         layout_h_invalid_buttons.addWidget(invalid_delete)
         layout_h_invalid_buttons.addWidget(invalid_export)
@@ -533,8 +546,8 @@ class Data_Dashboard(QMainWindow):
                 row, checkbox = row_result
                 checkboxes[name] = checkbox
                 #Enforce single selection for summary info
-                checkbox.stateChanged.connect(
-                    lambda state, n=name: self.on_checkbox_selected(n)
+                checkbox.clicked.connect(
+                    lambda checked, n=name: self.on_checkbox_selected(n)
                 )
             else:
                 row = row_result
@@ -552,6 +565,14 @@ class Data_Dashboard(QMainWindow):
         for name, checkbox in self.valid_checkboxes.items():
             if name != selected_name:
                 checkbox.setChecked(False)
+        any_checked = any(cb.isChecked() for cb in self.valid_checkboxes.values())
+        self.collected_export_button.setEnabled(any_checked)
+        self.collected_delete_button.setEnabled(any_checked)
+        self.collected_summary_button.setEnabled(any_checked)
+
+        invalid_checks = any(cb.isChecked() for cb in self.invalid_checkboxes.values())
+        self.invalid_export_button.setEnabled(invalid_checks)
+        self.invalid_delete_button.setEnabled(invalid_checks)
 
     def toggle_recording(self):
         self.is_recording = not self.is_recording
@@ -569,7 +590,21 @@ class Data_Dashboard(QMainWindow):
         button.setMinimumWidth(width)
         button.setFixedHeight(height)
         button.setCursor(QCursor(Qt.PointingHandCursor))
-        button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {textSize}; font-weight: 500;")
+        #button.setStyleSheet(f"background: {ACCENT_COLOR}; border-radius: 4px; color: {ALT_TEXT_COLOR}; font-size: {textSize}; font-weight: 500;")
+        button.setStyleSheet(f"""
+            QPushButton {{
+                background: {ACCENT_COLOR}; 
+                border-radius: 4px; 
+                color: {ALT_TEXT_COLOR}; 
+                font-size: {textSize}; 
+                font-weight: 500;
+            }}
+            QPushButton:disabled {{
+                background: {TINT_COLOR};
+                color: {TEXT_COLOR};
+                border: 1px solid {TEXT_COLOR};
+            }}
+        """)
         if on_click:
             button.clicked.connect(on_click)
         return button
