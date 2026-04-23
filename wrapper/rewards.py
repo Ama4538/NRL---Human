@@ -42,4 +42,10 @@ def caps_and_grabs(
             agent_team = Team(team_idx)
             reward += 1.0 if agent_team == team else -1.0
 
+    for team_idx, num_caps in enumerate(state['tags']):  
+        prev_num_caps = prev_state['tags'][team_idx]
+        if num_caps > prev_num_caps:
+            agent_team = Team(team_idx)
+            reward += 1.0 if agent_team == team else -1.0
+
     return reward
