@@ -24,6 +24,10 @@ SMALL_FONT_SIZE = "14px"
 SPACING = 20
 TOTAL_AGENT = 6
 
+class ScrollIgnoreComboBox(QComboBox):
+    def wheelEvent(self, event):
+        event.ignore()
+
 class Data_Dashboard(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -219,7 +223,7 @@ class Data_Dashboard(QMainWindow):
         label.setStyleSheet(f"font-size: {DEFAULT_FONT_SIZE}; font-weight: 600; color: {TEXT_COLOR}; padding-left: 10px;")
         row_layout.addWidget(label)
 
-        dropdown = QComboBox()
+        dropdown = ScrollIgnoreComboBox()
         dropdown.setCursor(Qt.PointingHandCursor)
         dropdown.view().viewport().setCursor(Qt.PointingHandCursor)
         dropdown.addItem("Select Policy")
