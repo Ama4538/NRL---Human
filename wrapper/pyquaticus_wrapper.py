@@ -207,7 +207,7 @@ class PyquaticusWrapper:
             print(f"[REASON] {reason}")
             return save_path, False, reason
 
-        save_path = os.path.join(folder, f"{filename}_{timestamp}.npz")
+        save_path = os.path.join(folder, f"{filename}_{tag}_{timestamp}.npz")
         np.savez_compressed(save_path, data=self.trajectory, agent_metadata=np.array(agent_metadata, dtype=object))
 
         print(f"Saved gameplay data to {save_path}")

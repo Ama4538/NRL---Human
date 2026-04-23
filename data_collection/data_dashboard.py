@@ -425,7 +425,7 @@ class Data_Dashboard(QMainWindow):
         
         if self.is_recording:
             tag = self.tag_input.text().strip() or "NoTag"
-            wrapper.save("test_run", tag)
+            wrapper.save("run", tag)
             self.refresh_tables()
             QMessageBox.information(self, "Game Finished", "Game run completed and data was saved successfully.")
         else:
@@ -756,11 +756,18 @@ class Data_Dashboard(QMainWindow):
         sessions_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sessions"))
         if not os.path.exists(sessions_dir):
             return [], []
-            
+
+        def get_timestamp(filename):
+            parts = filename.replace(".npz", "").split("_")
+            if len(parts) >= 2:
+                # timestamp is always the last two parts
+                return f"{parts[-2]}_{parts[-1]}"
+            return filename
+        
         valid_data = []
         invalid_data = []
         
-        for f in reversed(sorted(os.listdir(sessions_dir))):
+        for f in reversed(sorted(os.listdir(sessions_dir), key=get_timestamp)):
             if f.endswith(".npz"):
                 parts = f.replace(".npz", "").split("_")
                 name = f
